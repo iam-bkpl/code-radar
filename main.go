@@ -11,6 +11,12 @@ import (
 )
 
 var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
@@ -95,13 +101,25 @@ var (
 )
 
 func main() {
+	// Handle flags
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--help", "-h":
+			printHelp()
+			return
+		case "--version", "-v":
+			printVersion()
+			return
+		}
+	}
+
 	var commitHash string
 
 	if len(os.Args) > 1 {
 		commitHash = os.Args[1]
 	} else {
 		fmt.Println()
-		fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  🔍 Code Commit Tracker"))
+		fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  📡 Code Radar"))
 		fmt.Println()
 		fmt.Print("  Enter commit hash: ")
 		fmt.Scanln(&commitHash)
@@ -195,7 +213,7 @@ func printResults(hash string, info string, branches []string) {
 	fmt.Println()
 
 	// Title
-	title := titleStyle.Render("  📦  CODE COMMIT TRACKER  ")
+	title := titleStyle.Render("  📡  CODE RADAR  ")
 	fmt.Println(title)
 	fmt.Println()
 
@@ -347,4 +365,43 @@ func getBranchStyle(branch string) (string, lipgloss.Style) {
 	default:
 		return "OTHER", otherStyle
 	}
+}
+
+func printHelp() {
+	fmt.Println()
+	fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  📡 Code Radar"))
+	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render("  Track where your git commits have been deployed"))
+	fmt.Println()
+
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8F8F2"))
+	commandStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#50FA7B"))
+	flagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8BE9FD"))
+
+	fmt.Println(helpStyle.Render("  Usage:"))
+	fmt.Println()
+	fmt.Printf("    %s %s\n", commandStyle.Render("code-radar"), flagStyle.Render("<commit-hash>"))
+	fmt.Println(helpStyle.Render("      Track a specific commit across branches"))
+	fmt.Println()
+	fmt.Printf("    %s\n", commandStyle.Render("code-radar"))
+	fmt.Println(helpStyle.Render("      Interactive mode - prompts for commit hash"))
+	fmt.Println()
+
+	fmt.Println(helpStyle.Render("  Flags:"))
+	fmt.Println()
+	fmt.Printf("    %s, %s\n", flagStyle.Render("--help, -h"), helpStyle.Render("Show this help message"))
+	fmt.Printf("    %s, %s\n", flagStyle.Render("--version, -v"), helpStyle.Render("Show version information"))
+	fmt.Println()
+
+	fmt.Println(helpStyle.Render("  Examples:"))
+	fmt.Println()
+	fmt.Println(helpStyle.Render("    code-radar a1b2c3d"))
+	fmt.Println(helpStyle.Render("    code-radar abc1234def5678"))
+	fmt.Println(helpStyle.Render("    code-radar"))
+	fmt.Println()
+}
+
+func printVersion() {
+	fmt.Println()
+	fmt.Printf("code-radar %s (commit: %s, built: %s)\n", version, commit, date)
+	fmt.Println()
 }

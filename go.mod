@@ -1,4 +1,4 @@
-module github.com/code-commit
+module github.com/code-radar
 
 go 1.26.2
 
