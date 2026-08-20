@@ -14,13 +14,13 @@ Code Radar helps you visualize which branches contain a specific commit.
 ### Via Homebrew (Recommended)
 
 ```bash
-brew tap iambkpl/code-radar
+brew tap iam-bkpl/tap
 brew install code-radar
 ```
 
 ### Via GoReleaser
 
-Download the latest release from [GitHub Releases](https://github.com/iambkpl/code-radar/releases).
+Download the latest release from [GitHub Releases](https://github.com/iam-bkpl/code-radar/releases).
 
 ### Build from Source
 

@@ -57,11 +57,11 @@ changelog:
 
 brews:
   - repository:
-      owner: iambkpl
-      name: homebrew-code-radar
+      owner: iam-bkpl
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/iambkpl/code-radar"
+    homepage: "https://github.com/iam-bkpl/code-radar"
     description: "Track where your git commits have been deployed across branches"
     license: "MIT"
     skip_upload: auto
@@ -72,7 +72,7 @@ brews:
 
 release:
   github:
-    owner: iambkpl
+    owner: iam-bkpl
     name: code-radar
   draft: false
   prerelease: auto
@@ -80,7 +80,7 @@ release:
   header: |
     ## What's New
     
-    For detailed changelog, see [CHANGELOG.md](https://github.com/iambkpl/code-radar/blob/main/CHANGELOG.md)
+    For detailed changelog, see [CHANGELOG.md](https://github.com/iam-bkpl/code-radar/blob/main/CHANGELOG.md)
   footer: |
     ---
-    **Full Changelog**: https://github.com/iambkpl/code-radar/compare/{{ .PreviousTag }}...{{ .CurrentTag }}
+    **Full Changelog**: https://github.com/iam-bkpl/code-radar/compare/{{ .PreviousTag }}...{{ .CurrentTag }}

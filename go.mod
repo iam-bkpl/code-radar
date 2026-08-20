@@ -1,4 +1,4 @@
-module github.com/code-radar
+module github.com/iam-bkpl/code-radar
 
 go 1.26.2
 
