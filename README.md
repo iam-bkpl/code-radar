@@ -31,39 +31,49 @@ go build -o code-commit
 ## Example Output
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║                    CODE COMMIT TRACKER                       ║
-╠══════════════════════════════════════════════════════════════╣
-║ Commit:  a1b2c3d4e5f6...                                    ║
-║ Message: Add new feature                                     ║
-║ Author:  John Doe                                            ║
-║ Date:    2024-01-15 10:30:00 +0000                           ║
-╠══════════════════════════════════════════════════════════════╣
-║ Found in 5 branch(es):                                       ║
-╠══════════════════════════════════════════════════════════════╣
-║  [DEV] develop                                               ║
-║  [QA] qa                                                     ║
-║  [UAT] uat                                                   ║
-║  [STAGING] staging                                           ║
-║  [MASTER] master                                             ║
-╚══════════════════════════════════════════════════════════════╝
+  📦  CODE COMMIT TRACKER  
 
-Deployment Summary:
--------------------
-  [DEV] develop
-  [QA] qa
-  [UAT] uat
-  [STAGING] staging
-  [MASTER] master
+  ┌─ COMMIT DETAILS
+  │
+  │ Hash:     a1b2c3d4e5f6
+  │ Message:  Add new feature
+  │ Author:   John Doe
+  │ Date:     2024-01-15 10:30:00 +0000
+  │
+  
+  ┌─ BRANCHES (5 found)
+  │
+  ├─ → DEV develop
+  ├─ → QA qa
+  ├─ → UAT uat
+  ├─ → STAGING staging
+  └─ → MASTER master
+  │
+  
+  ┌─ DEPLOYMENT PIPELINE
+  │
+  ├─ DEV        develop
+  ├─ QA         qa
+  ├─ UAT        uat
+  ├─ STAGING    staging
+  └─ MASTER     master
+  │
 ```
 
 ## Branch Categories
 
-The tool automatically categorizes branches:
-- `[DEV]` - develop, dev
-- `[QA]` - qa, test
-- `[UAT]` - uat
-- `[STAGING]` - staging, stg
-- `[MASTER]` - master, main
-- `[PROD]` - prod, production
-- `[OTHER]` - everything else
+The tool automatically categorizes branches with color coding:
+- `DEV` (purple) - develop, dev
+- `QA` (yellow) - qa, test
+- `UAT` (orange) - uat
+- `STAGING` (cyan) - staging, stg
+- `MASTER` (violet) - master, main
+- `PROD` (red) - prod, production
+- `OTHER` (gray) - everything else
+
+## Features
+
+- Color-coded environment tags
+- Interactive or CLI argument mode
+- Deployment pipeline visualization
+- Clean, modern terminal UI using [lipgloss](https://github.com/charmbracelet/lipgloss)

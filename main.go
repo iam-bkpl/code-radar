@@ -6,6 +6,92 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#7D56F4")).
+			Padding(0, 2)
+
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFB86C")).
+			MarginTop(1)
+
+	labelStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#8BE9FD"))
+
+	valueStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F8F8F2"))
+
+	hashStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#50FA7B"))
+
+	branchStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F8F8F2")).
+			PaddingLeft(2)
+
+	// Environment tag styles
+	devStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#6272A4")).
+			Padding(0, 1)
+
+	qaStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#282A36")).
+			Background(lipgloss.Color("#F1FA8C")).
+			Padding(0, 1)
+
+	uatStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#282A36")).
+			Background(lipgloss.Color("#FFB86C")).
+			Padding(0, 1)
+
+	stagingStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#282A36")).
+			Background(lipgloss.Color("#8BE9FD")).
+			Padding(0, 1)
+
+	masterStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#BD93F9")).
+			Padding(0, 1)
+
+	prodStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#FF5555")).
+			Padding(0, 1)
+
+	otherStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#F8F8F2")).
+			Background(lipgloss.Color("#6272A4")).
+			Padding(0, 1)
+
+	successIcon = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#50FA7B")).
+			Bold(true)
+
+	errorIcon = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF5555")).
+			Bold(true)
+
+	checkMark = successIcon.Render(" ✓ ")
+	crossMark = errorIcon.Render(" ✗ ")
+	arrow     = lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9")).Render(" → ")
+	dot       = lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(" • ")
 )
 
 func main() {
@@ -14,33 +100,38 @@ func main() {
 	if len(os.Args) > 1 {
 		commitHash = os.Args[1]
 	} else {
-		fmt.Print("Enter commit hash (full or short): ")
+		fmt.Println()
+		fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  🔍 Code Commit Tracker"))
+		fmt.Println()
+		fmt.Print("  Enter commit hash: ")
 		fmt.Scanln(&commitHash)
 	}
 
 	commitHash = strings.TrimSpace(commitHash)
 	if commitHash == "" {
-		fmt.Fprintln(os.Stderr, "Error: commit hash is required")
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+"commit hash is required")
 		os.Exit(1)
 	}
 
 	// Verify commit exists
 	if err := verifyCommit(commitHash); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Println()
+		fmt.Println(errorIcon.Render(" Error: ") + err.Error())
+		fmt.Println()
 		os.Exit(1)
 	}
 
 	// Get commit info
 	commitInfo, err := getCommitInfo(commitHash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting commit info: %v\n", err)
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error getting commit info: ")+err.Error())
 		os.Exit(1)
 	}
 
 	// Find branches containing this commit
 	branches, err := findBranchesWithCommit(commitHash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error finding branches: %v\n", err)
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error finding branches: ")+err.Error())
 		os.Exit(1)
 	}
 
@@ -66,7 +157,6 @@ func getCommitInfo(hash string) (string, error) {
 }
 
 func findBranchesWithCommit(hash string) ([]string, error) {
-	// Use --contains to find all branches that contain the commit
 	cmd := exec.Command("git", "branch", "--contains", hash, "--format=%(refname:short)")
 	out, err := cmd.Output()
 	if err != nil {
@@ -103,52 +193,103 @@ func printResults(hash string, info string, branches []string) {
 	}
 
 	fmt.Println()
-	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                    CODE COMMIT TRACKER                       ║")
-	fmt.Println("╠══════════════════════════════════════════════════════════════╣")
-	fmt.Printf("║ Commit:  %-50s ║\n", truncateString(fullHash, 50))
-	if message != "" {
-		fmt.Printf("║ Message: %-50s ║\n", truncateString(message, 50))
-	}
-	if author != "" {
-		fmt.Printf("║ Author:  %-50s ║\n", truncateString(author, 50))
-	}
-	if date != "" {
-		fmt.Printf("║ Date:    %-50s ║\n", truncateString(date, 50))
-	}
-	fmt.Println("╠══════════════════════════════════════════════════════════════╣")
 
-	if len(branches) == 0 {
-		fmt.Println("║ No branches contain this commit                              ║")
-	} else {
-		fmt.Printf("║ Found in %d branch(es):%s║\n", len(branches), strings.Repeat(" ", 41-len(fmt.Sprintf("%d", len(branches)))))
-		fmt.Println("╠══════════════════════════════════════════════════════════════╣")
-
-		for _, branch := range branches {
-			env := categorizeSingleBranch(branch)
-			fmt.Printf("║  %s %-52s ║\n", env, branch)
-		}
-	}
-
-	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
+	// Title
+	title := titleStyle.Render("  📦  CODE COMMIT TRACKER  ")
+	fmt.Println(title)
 	fmt.Println()
 
-	// Summary
-	if len(branches) > 0 {
-		fmt.Println("Deployment Summary:")
-		fmt.Println("-------------------")
-		envs := make(map[string][]string)
-		for _, b := range branches {
-			env := categorizeSingleBranch(b)
-			envs[env] = append(envs[env], b)
-		}
-		envOrder := []string{"[DEV]", "[QA]", "[UAT]", "[STAGING]", "[MASTER]", "[PROD]", "[OTHER]"}
-		for _, env := range envOrder {
-			if bs, ok := envs[env]; ok {
-				fmt.Printf("  %s %s\n", env, strings.Join(bs, ", "))
+	// Commit info section
+	fmt.Println(headerStyle.Render("  ┌─ COMMIT DETAILS"))
+	fmt.Println("  │")
+	fmt.Printf("  %s %s\n", labelStyle.Render("Hash:"), hashStyle.Render(fullHash[:12]))
+	if message != "" {
+		fmt.Printf("  %s %s\n", labelStyle.Render("Message:"), valueStyle.Render(truncateString(message, 55)))
+	}
+	if author != "" {
+		fmt.Printf("  %s %s\n", labelStyle.Render("Author:"), valueStyle.Render(author))
+	}
+	if date != "" {
+		fmt.Printf("  %s %s\n", labelStyle.Render("Date:"), valueStyle.Render(truncateString(date, 40)))
+	}
+	fmt.Println("  │")
+	fmt.Println()
+
+	// Branches section
+	if len(branches) == 0 {
+		fmt.Println(headerStyle.Render("  ┌─ BRANCHES"))
+		fmt.Println("  │")
+		fmt.Printf("  %s %s\n", crossMark, errorIcon.Render("No branches contain this commit"))
+		fmt.Println("  │")
+	} else {
+		fmt.Println(headerStyle.Render(fmt.Sprintf("  ┌─ BRANCHES (%d found)", len(branches))))
+		fmt.Println("  │")
+
+		for i, branch := range branches {
+			envTag, style := getBranchStyle(branch)
+			connector := "├"
+			if i == len(branches)-1 {
+				connector = "└"
 			}
+
+			fmt.Printf("  %s %s %s\n",
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(connector+"─"),
+				arrow,
+				branchStyle.Render(style.Render(envTag)+" "+branch),
+			)
 		}
-		fmt.Println()
+		fmt.Println("  │")
+	}
+
+	// Summary section
+	if len(branches) > 0 {
+		fmt.Println(headerStyle.Render("  ┌─ DEPLOYMENT PIPELINE"))
+		fmt.Println("  │")
+		printPipeline(branches)
+		fmt.Println("  │")
+	}
+
+	fmt.Println()
+}
+
+func printPipeline(branches []string) {
+	envs := categorizeBranches(branches)
+
+	// Define pipeline order
+	pipeline := []struct {
+		name  string
+		style lipgloss.Style
+	}{
+		{"DEV", devStyle},
+		{"QA", qaStyle},
+		{"UAT", uatStyle},
+		{"STAGING", stagingStyle},
+		{"MASTER", masterStyle},
+		{"PROD", prodStyle},
+	}
+
+	for i, p := range pipeline {
+		if bs, ok := envs[p.name]; ok {
+			connector := "├"
+			if i == len(pipeline)-1 {
+				connector = "└"
+			}
+
+			fmt.Printf("  %s %s %s\n",
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(connector+"─"),
+				p.style.Render(fmt.Sprintf(" %s ", p.name)),
+				valueStyle.Render(strings.Join(bs, ", ")),
+			)
+		}
+	}
+
+	// Other branches
+	if bs, ok := envs["OTHER"]; ok {
+		fmt.Printf("  %s %s %s\n",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render("└─"),
+			otherStyle.Render(" OTHER"),
+			valueStyle.Render(strings.Join(bs, ", ")),
+		)
 	}
 }
 
@@ -162,28 +303,48 @@ func truncateString(s string, maxLen int) string {
 func categorizeBranches(branches []string) map[string][]string {
 	result := make(map[string][]string)
 	for _, b := range branches {
-		env := categorizeSingleBranch(b)
+		env := categorizeBranchName(b)
 		result[env] = append(result[env], b)
 	}
 	return result
 }
 
-func categorizeSingleBranch(branch string) string {
+func categorizeBranchName(branch string) string {
 	lower := strings.ToLower(branch)
 	switch {
 	case lower == "master" || lower == "main":
-		return "[MASTER]"
+		return "MASTER"
 	case lower == "prod" || lower == "production":
-		return "[PROD]"
+		return "PROD"
 	case strings.Contains(lower, "staging") || strings.Contains(lower, "stg"):
-		return "[STAGING]"
+		return "STAGING"
 	case strings.Contains(lower, "uat"):
-		return "[UAT]"
+		return "UAT"
 	case strings.Contains(lower, "qa") || strings.Contains(lower, "test"):
-		return "[QA]"
+		return "QA"
 	case lower == "develop" || lower == "dev":
-		return "[DEV]"
+		return "DEV"
 	default:
-		return "[OTHER]"
+		return "OTHER"
+	}
+}
+
+func getBranchStyle(branch string) (string, lipgloss.Style) {
+	env := categorizeBranchName(branch)
+	switch env {
+	case "DEV":
+		return "DEV", devStyle
+	case "QA":
+		return "QA", qaStyle
+	case "UAT":
+		return "UAT", uatStyle
+	case "STAGING":
+		return "STAGING", stagingStyle
+	case "MASTER":
+		return "MASTER", masterStyle
+	case "PROD":
+		return "PROD", prodStyle
+	default:
+		return "OTHER", otherStyle
 	}
 }
