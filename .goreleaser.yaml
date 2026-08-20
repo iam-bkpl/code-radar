@@ -1,48 +1,51 @@
-version: 2
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
 
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
 project_name: code-radar
 
 before:
   hooks:
+    # You may remove this if you don't use go modules.
     - go mod tidy
+    # you may remove this if you don't need go generate
     - go generate ./...
 
 builds:
-  - id: code-radar
-    main: .
-    binary: code-radar
+  - main: ./...
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
+      - darwin
     goarch:
-      - amd64
       - arm64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+      - amd64
+      - "386"
 
 archives:
-  - id: code-radar
-    format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - formats: [tar.gz]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
-    files:
-      - LICENSE*
-      - README*
+        formats: [zip]
 
 checksum:
-  name_template: "checksums.txt"
-  algorithm: sha256
-
-snapshot:
-  version_template: "{{ incpatch .Version }}-next"
+    name_template: 'checksums.txt'
 
 changelog:
   sort: asc
@@ -50,37 +53,21 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^ci:"
-      - "^chore:"
-      - Merge pull request
-      - Merge branch
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: code-radar
+    repository:
       owner: iam-bkpl
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/iam-bkpl/code-radar"
-    description: "Track where your git commits have been deployed across branches"
+    commit_author:
+      name: iam-bkpl
+    homepage: "https://github.com/iam-bkpl/time-pugcha"
+    description: "Where is my code?"
     license: "MIT"
-    skip_upload: auto
-    test: |
-      system "#{bin}/code-radar", "--help"
-    install: |
-      bin.install "code-radar"
-
 release:
-  github:
-    owner: iam-bkpl
-    name: code-radar
-  draft: false
-  prerelease: auto
-  name_template: "{{.ProjectName}} v{{.Version}}"
-  header: |
-    ## What's New
-    
-    For detailed changelog, see [CHANGELOG.md](https://github.com/iam-bkpl/code-radar/blob/main/CHANGELOG.md)
-  footer: |
+  footer: >-
+
     ---
-    **Full Changelog**: https://github.com/iam-bkpl/code-radar/compare/{{ .PreviousTag }}...{{ .CurrentTag }}
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
