@@ -62,8 +62,8 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_author:
       name: iam-bkpl
-    homepage: "https://github.com/iam-bkpl/time-pugcha"
-    description: "Where is my code?"
+    homepage: "https://github.com/iam-bkpl/code-radar"
+    description: "Track where your git commits have been deployed across branches"
     license: "MIT"
 release:
   footer: >-
