@@ -31,7 +31,7 @@ Then run `code-radar` normally.
 ### Linux (curl script)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/iam-bkpl/code-radar/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/iam-bkpl/code-radar/master/install.sh | bash
 ```
 
 This installs to `/usr/local/bin/code-radar`.
@@ -76,7 +76,7 @@ xattr -cr /opt/homebrew/bin/code-radar
 Re-run the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/iam-bkpl/code-radar/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/iam-bkpl/code-radar/master/install.sh | bash
 ```
 
 Or download the latest release manually (see [Linux install](#linux-curl-script) above).
