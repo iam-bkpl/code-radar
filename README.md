@@ -1,6 +1,7 @@
 # Code Radar
 
 Track where your git commits have been deployed across branches.
+![](image.png)
 
 ## Purpose
 
