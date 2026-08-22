@@ -106,8 +106,8 @@ func startWebServer(addr string) {
 
 	fmt.Println()
 	fmt.Println("  📡 Code Radar Web UI")
-	fmt.Printf("  Listening on %s\n\n", addr)
-	fmt.Printf("  Open %s in your browser\n\n", addr)
+	fmt.Printf("  Listening on http://localhost%s\n\n", addr)
+	fmt.Printf("  Open http://localhost%s in your browser\n\n", addr)
 	fmt.Println("  Press Ctrl+C to stop")
 	fmt.Println()
 

@@ -234,7 +234,7 @@ func main() {
 	shortOut := false
 	initMode := false
 	webMode := false
-	webAddr := ":8080"
+	webAddr := ":9876"
 	commitHash := ""
 
 	for _, arg := range args {
@@ -518,7 +518,7 @@ func printHelp() {
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--json"), flagStyle.Render("-j"), helpStyle.Render("Output as JSON"))
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--short"), flagStyle.Render("-s"), helpStyle.Render("Compact output"))
 	fmt.Printf("    %s        %s\n", flagStyle.Render("--init"), helpStyle.Render("Generate .code-radar.yaml config"))
-	fmt.Printf("    %s        %s\n", flagStyle.Render("--web"), helpStyle.Render("Start web UI on localhost:8080"))
+	fmt.Printf("    %s        %s\n", flagStyle.Render("--web"), helpStyle.Render("Start web UI on localhost:9876"))
 	fmt.Println()
 
 	fmt.Println(helpStyle.Render("  Config:"))
