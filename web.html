@@ -401,13 +401,34 @@
     0%, 100% { opacity: 0.5; }
     50% { opacity: 1; }
   }
+
+  .footer {
+    text-align: center;
+    padding: 24px 0 40px;
+    color: #6272a4;
+    font-size: 0.8rem;
+  }
+
+  .footer a {
+    color: #8be9fd;
+    text-decoration: none;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+  }
+
+  .footer-sep {
+    margin: 0 8px;
+    color: #3a3d4e;
+  }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
     <h1>📡 Code Radar</h1>
-    <p>Track where your git commits have been deployed</p>
+    <p>Know exactly which branches have your commit</p>
   </div>
 
   <div class="nav-tabs">
@@ -494,6 +515,14 @@
       <div class="error-msg" id="configMsg" style="margin-top: 12px;"></div>
     </div>
   </div>
+</div>
+
+<div class="footer">
+  <a href="https://github.com/iam-bkpl/code-radar" target="_blank">GitHub</a>
+  <span class="footer-sep">·</span>
+  <span class="footer-coffee">
+      ☕️
+  </span>
 </div>
 
 <script>

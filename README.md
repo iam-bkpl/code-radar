@@ -1,15 +1,15 @@
 # Code Radar
 
-Track where your git commits have been deployed across branches.
-![](image.png)
-![](image_1.png)
+**"Is this commit in production yet?" — find out in 2 seconds.**
 
-## Purpose
+![](img/cli-img.png)
+![](img/web-img.png)
 
-When you merge code into `develop`, it can flow to multiple branches:
-- `qa` → `uat` → `staging` → `master` → `prod`
+## What it does
 
-Code Radar helps you visualize which branches contain a specific commit across your remote repositories.
+You merge a PR into `develop`. Three weeks later someone asks "did this make it to staging?" You have no idea.
+
+Code Radar answers that instantly. Paste a commit hash, it tells you exactly which remote branches contain it — grouped by environment, color-coded, done.
 
 ## Installation
 
@@ -286,13 +286,13 @@ brew install iam-bkpl/tap/code-radar
 
 ## Features
 
-- Scans remote branches only (not local)
-- Auto-fetches before scanning
+- Scans remote branches only — no local branch noise
+- Auto-fetches remotes before every scan
 - Configurable environments with custom patterns and colors
-- Web UI with config editor
-- JSON output for scripting
-- Loading spinner in terminal
-- Cross-platform (macOS, Linux, Windows)
+- Web UI with live config editor
+- JSON output for CI pipelines and scripting
+- Self-updating — `code-radar --upgrade` and you're done
+- Works on macOS, Linux, and Windows
 
 ## License
 
