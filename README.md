@@ -2,8 +2,8 @@
 
 **"Is this commit in production yet?" — find out in 2 seconds.**
 
-![](img/cli-img.png)
 ![](img/web-img.png)
+![](img/cli-img.png)
 
 ## What it does
 
