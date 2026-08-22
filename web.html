@@ -185,6 +185,12 @@
     gap: 12px;
     padding: 10px 0;
     border-bottom: 1px solid #3a3d4e;
+    animation: branchIn 0.3s ease both;
+  }
+
+  @keyframes branchIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
   }
 
   .branch-item:last-child { border-bottom: none; }
@@ -325,6 +331,76 @@
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  .radar-container {
+    display: none;
+    position: relative;
+    width: 160px;
+    height: 180px;
+    margin: 32px auto;
+  }
+
+  .radar-container.visible { display: block; }
+
+  .radar-ring {
+    position: absolute;
+    border: 1px solid rgba(139, 233, 253, 0.3);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: ringPulse 2s ease-in-out infinite;
+  }
+  .radar-ring.r1 { width: 50px; height: 50px; animation-delay: 0s; }
+  .radar-ring.r2 { width: 100px; height: 100px; animation-delay: 0.3s; }
+  .radar-ring.r3 { width: 150px; height: 150px; animation-delay: 0.6s; }
+
+  @keyframes ringPulse {
+    0%, 100% { border-color: rgba(139, 233, 253, 0.15); }
+    50% { border-color: rgba(139, 233, 253, 0.5); }
+  }
+
+  .radar-center {
+    position: absolute;
+    width: 10px; height: 10px;
+    background: #50fa7b;
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 16px 4px rgba(80, 250, 123, 0.6);
+  }
+
+  .radar-sweep {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    top: 0;
+    left: 50%;
+    transform-origin: bottom left;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(189, 147, 249, 0.5) 20deg, transparent 60deg);
+    border-radius: 50% 50% 0 0;
+    animation: radarSweep 1.5s linear infinite;
+  }
+
+  @keyframes radarSweep {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .radar-text {
+    position: absolute;
+    bottom: -28px;
+    width: 100%;
+    text-align: center;
+    color: #bd93f9;
+    font-size: 0.85rem;
+    font-weight: 500;
+    animation: radarPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes radarPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -349,6 +425,16 @@
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
+
+    <div class="radar-container" id="radarAnimation">
+      <div class="radar-sweep"></div>
+      <div class="radar-ring r1"></div>
+      <div class="radar-ring r2"></div>
+      <div class="radar-ring r3"></div>
+      <div class="radar-center"></div>
+      <div class="radar-text">Scanning remotes...</div>
+    </div>
+
     <div class="result" id="result">
       <div class="card">
         <div class="card-title">Commit Details</div>
@@ -406,12 +492,14 @@
 </div>
 
 <script>
-const envColors = {
-  DEV: '#6272a4', QA: '#F1FA8C', UAT: '#FFB86C',
-  STAGING: '#8BE9FD', MASTER: '#BD93F9', PROD: '#FF5555', OTHER: '#6272a4'
-};
-
 let currentConfig = { environments: [] };
+let envColors = {};
+
+function rebuildEnvColors() {
+  envColors = {};
+  currentConfig.environments.forEach(e => { envColors[e.name] = e.color; });
+  envColors['OTHER'] = envColors['OTHER'] || '#6272a4';
+}
 
 document.getElementById('commitInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') scanCommit();
@@ -423,11 +511,13 @@ async function scanCommit() {
 
   const btn = document.getElementById('scanBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>';
 
   document.getElementById('errorMsg').classList.remove('visible');
   document.getElementById('result').classList.remove('visible');
   document.getElementById('emptyState').classList.remove('visible');
+
+  const radarEl = document.getElementById('radarAnimation');
+  radarEl.classList.add('visible');
 
   try {
     const res = await fetch('/api/scan', {
@@ -436,6 +526,8 @@ async function scanCommit() {
       body: JSON.stringify({ commit: input })
     });
     const data = await res.json();
+
+    radarEl.classList.remove('visible');
 
     if (data.error) {
       showError(data.error);
@@ -454,11 +546,12 @@ async function scanCommit() {
     if (data.branches.length === 0) {
       list.innerHTML = '<div class="empty-state"><p>No remote branches contain this commit</p></div>';
     } else {
-      data.branches.forEach(br => {
+      data.branches.forEach((br, i) => {
         const li = document.createElement('li');
         li.className = 'branch-item';
+        li.style.animationDelay = `${i * 80}ms`;
         const color = envColors[br.env] || '#6272a4';
-        const textColor = ['#F1FA8C', '#FFB86C', '#8BE9FD'].includes(color) ? '#282a36' : '#FAFAFA';
+        const textColor = ['#F1FA8C', '#FFB86C', '#8BE9FD', '#50FA7B'].includes(color.toUpperCase()) ? '#282a36' : '#FAFAFA';
         li.innerHTML = `
           <span class="env-tag" style="background: ${color}; color: ${textColor};">${br.env}</span>
           <span class="branch-name">${br.name}</span>
@@ -469,6 +562,7 @@ async function scanCommit() {
 
     document.getElementById('result').classList.add('visible');
   } catch (err) {
+    radarEl.classList.remove('visible');
     showError('Failed to connect to server');
   } finally {
     btn.disabled = false;
@@ -494,6 +588,7 @@ async function loadConfig() {
   try {
     const res = await fetch('/api/config');
     currentConfig = await res.json();
+    rebuildEnvColors();
     renderConfig();
   } catch (err) {
     console.error('Failed to load config');
@@ -530,6 +625,7 @@ async function saveConfig() {
     if (data.error) {
       showConfigMsg(data.error, true);
     } else {
+      rebuildEnvColors();
       showConfigMsg('Config saved!', false);
     }
   } catch (err) {
@@ -549,6 +645,8 @@ function showConfigMsg(msg, isError) {
   el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
+
+loadConfig();
 </script>
 </body>
 </html>
