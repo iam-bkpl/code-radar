@@ -59,7 +59,23 @@ sudo mv code-radar /usr/local/bin/
 
 ## Upgrading
 
-### macOS
+### Using Code Radar (recommended)
+
+```bash
+# Check for latest version
+code-radar --check
+
+# Upgrade to latest version
+code-radar --upgrade
+
+# List all available versions
+code-radar --versions
+
+# Install a specific version
+code-radar --install v1.0.0
+```
+
+### Using Homebrew (macOS)
 
 ```bash
 brew upgrade code-radar
@@ -71,15 +87,11 @@ If you get trust errors after upgrade:
 xattr -cr /opt/homebrew/bin/code-radar
 ```
 
-### Linux
-
-Re-run the install script:
+### Using install script (Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/iam-bkpl/code-radar/master/install.sh | bash
 ```
-
-Or download the latest release manually (see [Linux install](#linux-curl-script) above).
 
 ### From Source
 
@@ -112,6 +124,18 @@ code-radar --web
 
 # Generate config file
 code-radar --init
+
+# Upgrade to latest version
+code-radar --upgrade
+
+# Check for updates
+code-radar --check
+
+# List available versions
+code-radar --versions
+
+# Install specific version
+code-radar --install v1.0.0
 ```
 
 ### Web UI
@@ -131,6 +155,10 @@ code-radar --web
 | `--short` | `-s` | Compact one-line output |
 | `--web` | | Start web UI on port 9876 |
 | `--init` | | Generate `.code-radar.yaml` config |
+| `--upgrade` | | Upgrade to latest version |
+| `--check` | | Check for latest version |
+| `--versions` | | List available versions |
+| `--install <ver>` | | Install specific version (e.g. `v1.0.0`) |
 
 ## Configuration
 

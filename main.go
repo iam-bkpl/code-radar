@@ -234,10 +234,14 @@ func main() {
 	shortOut := false
 	initMode := false
 	webMode := false
+	upgradeMode := false
+	checkMode := false
+	versionsMode := false
 	webAddr := ":9876"
 	commitHash := ""
+	installVersion := ""
 
-	for _, arg := range args {
+	for i, arg := range args {
 		switch arg {
 		case "--help", "-h":
 			printHelp()
@@ -253,8 +257,18 @@ func main() {
 			initMode = true
 		case "--web":
 			webMode = true
+		case "--upgrade":
+			upgradeMode = true
+		case "--check":
+			checkMode = true
+		case "--versions":
+			versionsMode = true
+		case "--install":
+			if i+1 < len(args) {
+				installVersion = args[i+1]
+			}
 		default:
-			if !strings.HasPrefix(arg, "-") {
+			if !strings.HasPrefix(arg, "-") && installVersion == "" {
 				commitHash = arg
 			}
 		}
@@ -267,6 +281,26 @@ func main() {
 		}
 		fmt.Println(successIcon.Render(" Created .code-radar.yaml"))
 		fmt.Println(dimStyle.Render(" Edit it to match your branch naming conventions"))
+		return
+	}
+
+	if upgradeMode {
+		runUpgrade()
+		return
+	}
+
+	if checkMode {
+		runCheck()
+		return
+	}
+
+	if versionsMode {
+		runVersions()
+		return
+	}
+
+	if installVersion != "" {
+		runInstall(installVersion)
 		return
 	}
 
@@ -511,7 +545,7 @@ func printHelp() {
 	fmt.Printf("    %s %s\n", commandStyle.Render("code-radar"), flagStyle.Render("[flags] <commit-hash>"))
 	fmt.Println()
 
-	fmt.Println(helpStyle.Render("  Flags:"))
+	fmt.Println(helpStyle.Render("  Scan Flags:"))
 	fmt.Println()
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--help"), flagStyle.Render("-h"), helpStyle.Render("Show this help message"))
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--version"), flagStyle.Render("-v"), helpStyle.Render("Show version information"))
@@ -519,6 +553,14 @@ func printHelp() {
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--short"), flagStyle.Render("-s"), helpStyle.Render("Compact output"))
 	fmt.Printf("    %s        %s\n", flagStyle.Render("--init"), helpStyle.Render("Generate .code-radar.yaml config"))
 	fmt.Printf("    %s        %s\n", flagStyle.Render("--web"), helpStyle.Render("Start web UI on localhost:9876"))
+	fmt.Println()
+
+	fmt.Println(helpStyle.Render("  Update Flags:"))
+	fmt.Println()
+	fmt.Printf("    %s          %s\n", flagStyle.Render("--upgrade"), helpStyle.Render("Upgrade to latest version"))
+	fmt.Printf("    %s          %s\n", flagStyle.Render("--check"), helpStyle.Render("Check for latest version"))
+	fmt.Printf("    %s        %s\n", flagStyle.Render("--versions"), helpStyle.Render("List available versions"))
+	fmt.Printf("    %s      %s\n", flagStyle.Render("--install"), helpStyle.Render("Install specific version (e.g. v1.0.0)"))
 	fmt.Println()
 
 	fmt.Println(helpStyle.Render("  Config:"))

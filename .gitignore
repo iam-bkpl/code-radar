@@ -1,3 +1,5 @@
 dist/
 *.exe
 .code-radar.yaml
+
+./code-radar
