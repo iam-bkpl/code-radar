@@ -150,15 +150,16 @@ func downloadAndInstall(version string) error {
 
 	fmt.Printf("  Installing to %s...\n", exePath)
 
-	if err := copyFile(binaryPath, exePath); err != nil {
-		// Try with sudo
+	// Try cp first, then sudo cp if needed
+	cpCmd := exec.Command("cp", binaryPath, exePath)
+	if err := cpCmd.Run(); err != nil {
 		fmt.Printf("  Retrying with sudo...\n")
-		cmd := exec.Command("sudo", "cp", binaryPath, exePath)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("install failed: %w\n  Try: sudo cp %s %s", err, binaryPath, exePath)
+		sudoCmd := exec.Command("sudo", "cp", binaryPath, exePath)
+		sudoCmd.Stdin = os.Stdin
+		sudoCmd.Stdout = os.Stdout
+		sudoCmd.Stderr = os.Stderr
+		if err := sudoCmd.Run(); err != nil {
+			return fmt.Errorf("install failed\n  Manual install: sudo cp %s %s", binaryPath, exePath)
 		}
 	}
 
@@ -289,23 +290,6 @@ func extractZip(archivePath string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("binary not found in archive")
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
 }
 
 func runUpgrade() {
