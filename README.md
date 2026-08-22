@@ -2,6 +2,7 @@
 
 Track where your git commits have been deployed across branches.
 ![](image.png)
+![](image_1.png)
 
 ## Purpose
 
@@ -177,13 +178,6 @@ environments:
 
 **Matching**: Branch names are matched case-insensitively using exact match or contains. First match wins.
 
-## Example Output
-
-#### CLI
-![](image_1.png)
-
-#### Web
-![](image.png)
 
 ## Troubleshooting
 
