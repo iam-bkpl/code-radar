@@ -179,29 +179,11 @@ environments:
 ## Example Output
 
 #### CLI
+![](image_1.png)
 
-```
-  📡  CODE RADAR  
-
-  ┌─ COMMIT DETAILS
-  │
-  Hash:        a1b2c3d4e5f6
-  Message:     Add new feature
-  Author:      John Doe
-  Date:        2024-01-15 10:30:00 +0000
-  │
-
-  ┌─ BRANCHES (5 found)
-  │
-  ├─ → DEV develop
-  ├─ → QA qa
-  ├─ → UAT uat
-  ├─ → STAGING staging
-  └─ → MASTER master
-  │
-```
 #### Web
 ![](image.png)
+
 ## Troubleshooting
 
 ### macOS: "code-radar cannot be opened because the developer cannot be verified"
