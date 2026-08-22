@@ -410,27 +410,96 @@ func renderFull(r scanResult, cfg Config) string {
 		b.WriteString(fmt.Sprintf("  %s %s\n", errorIcon.Render(" ✗ "), errorStyle().Render("No remote branches contain this commit")))
 		b.WriteString("  │\n")
 	} else {
-		b.WriteString(headerStyle.Render(fmt.Sprintf("  ┌─ BRANCHES (%d found)", len(r.Branches))))
+		// Split into tracked and other
+		var tracked []branchInfo
+		var other []branchInfo
+		for _, br := range r.Branches {
+			if br.Env == "OTHER" {
+				other = append(other, br)
+			} else {
+				tracked = append(tracked, br)
+			}
+		}
+
+		// Tracked branches
+		b.WriteString(headerStyle.Render(fmt.Sprintf("  ┌─ TRACKED ENVIRONMENTS (%d)", len(tracked))))
 		b.WriteString("\n")
 		b.WriteString("  │\n")
 
-		for i, br := range r.Branches {
-			connector := "├"
-			if i == len(r.Branches)-1 {
-				connector = "└"
+		if len(tracked) == 0 {
+			b.WriteString(fmt.Sprintf("  %s\n", dimStyle.Render("  No branches matched configured environments")))
+		} else {
+			// Group by env
+			envOrder := make([]string, 0)
+			envMap := make(map[string][]branchInfo)
+			for _, br := range tracked {
+				if _, exists := envMap[br.Env]; !exists {
+					envOrder = append(envOrder, br.Env)
+				}
+				envMap[br.Env] = append(envMap[br.Env], br)
 			}
 
-			envStyle := getEnvStyleByName(br.Env, cfg)
-			envTag := envStyle.Render(fmt.Sprintf(" %s ", br.Env))
+			// Render in config order if possible
+			orderedEnvs := make([]string, 0)
+			for _, env := range cfg.Environments {
+				if _, ok := envMap[env.Name]; ok {
+					orderedEnvs = append(orderedEnvs, env.Name)
+				}
+			}
+			for _, e := range envOrder {
+				found := false
+				for _, oe := range orderedEnvs {
+					if oe == e {
+						found = true
+						break
+					}
+				}
+				if !found {
+					orderedEnvs = append(orderedEnvs, e)
+				}
+			}
 
-			b.WriteString(fmt.Sprintf("  %s %s %s %s\n",
-				dimStyle.Render(connector+"─"),
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9")).Render("→"),
-				envTag,
-				branchNameStyle.Render(br.Name),
-			))
+			for _, envName := range orderedEnvs {
+				envBranches := envMap[envName]
+				envStyle := getEnvStyleByName(envName, cfg)
+				envTag := envStyle.Render(fmt.Sprintf(" %s ", envName))
+
+				b.WriteString(fmt.Sprintf("  %s %s\n",
+					dimStyle.Render("├─"),
+					envTag,
+				))
+
+				for j, br := range envBranches {
+					conn := "│  ├"
+					if j == len(envBranches)-1 {
+						conn = "│  └"
+					}
+					b.WriteString(fmt.Sprintf("  %s %s\n",
+						dimStyle.Render(conn+"─"),
+						branchNameStyle.Render(br.Name),
+					))
+				}
+			}
 		}
-		b.WriteString("  │\n")
+		b.WriteString("  │\n\n")
+
+		// Other branches
+		if len(other) > 0 {
+			b.WriteString(headerStyle.Render(fmt.Sprintf("  ┌─ OTHER BRANCHES (%d)", len(other))))
+			b.WriteString("\n")
+			b.WriteString("  │\n")
+			for i, br := range other {
+				connector := "├"
+				if i == len(other)-1 {
+					connector = "└"
+				}
+				b.WriteString(fmt.Sprintf("  %s %s\n",
+					dimStyle.Render(connector+"─"),
+					branchNameStyle.Render(br.Name),
+				))
+			}
+			b.WriteString("  │\n")
+		}
 	}
 
 	b.WriteString("\n")

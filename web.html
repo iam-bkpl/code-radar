@@ -193,6 +193,21 @@
     to { opacity: 1; transform: translateX(0); }
   }
 
+  .env-group-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 2px 0;
+    border-bottom: none;
+  }
+
+  .branch-item-nested {
+    padding-left: 20px;
+    border-bottom: 1px solid #3a3d4e;
+  }
+
+  .branch-item-nested:last-child { border-bottom: none; }
+
   .branch-item:last-child { border-bottom: none; }
 
   .env-tag {
@@ -457,8 +472,13 @@
       </div>
 
       <div class="card">
-        <div class="card-title" id="branchesTitle">Branches</div>
-        <ul class="branch-list" id="branchList"></ul>
+        <div class="card-title" id="trackedTitle">Tracked Environments</div>
+        <ul class="branch-list" id="trackedList"></ul>
+      </div>
+
+      <div class="card" id="otherCard" style="display: none;">
+        <div class="card-title" id="otherTitle">Other Branches</div>
+        <ul class="branch-list" id="otherList"></ul>
       </div>
     </div>
 
@@ -539,25 +559,71 @@ async function scanCommit() {
     document.getElementById('rAuthor').textContent = data.author || '—';
     document.getElementById('rDate').textContent = data.date || '—';
 
-    const list = document.getElementById('branchList');
-    list.innerHTML = '';
-    document.getElementById('branchesTitle').textContent = `Branches (${data.branches.length} found)`;
+    const tracked = data.branches.filter(b => b.env !== 'OTHER');
+    const other = data.branches.filter(b => b.env === 'OTHER');
 
-    if (data.branches.length === 0) {
-      list.innerHTML = '<div class="empty-state"><p>No remote branches contain this commit</p></div>';
+    // Tracked environments - grouped by env
+    const trackedList = document.getElementById('trackedList');
+    trackedList.innerHTML = '';
+    document.getElementById('trackedTitle').textContent = `Tracked Environments (${tracked.length})`;
+
+    if (tracked.length === 0) {
+      trackedList.innerHTML = '<div class="empty-state"><p>No branches matched configured environments</p></div>';
     } else {
-      data.branches.forEach((br, i) => {
+      // Group by env, preserve config order
+      const envGroups = {};
+      const envOrder = [];
+      currentConfig.environments.forEach(e => {
+        if (tracked.some(b => b.env === e.name)) {
+          envOrder.push(e.name);
+        }
+      });
+      tracked.forEach(b => {
+        if (!envOrder.includes(b.env)) envOrder.push(b.env);
+        if (!envGroups[b.env]) envGroups[b.env] = [];
+        envGroups[b.env].push(b);
+      });
+
+      envOrder.forEach(envName => {
+        const group = envGroups[envName];
+        if (!group) return;
+
+        const color = envColors[envName] || '#6272a4';
+        const textColor = ['#F1FA8C', '#FFB86C', '#8BE9FD', '#50FA7B'].includes(color.toUpperCase()) ? '#282a36' : '#FAFAFA';
+
+        // Env header
+        const header = document.createElement('li');
+        header.className = 'env-group-header';
+        header.innerHTML = `<span class="env-tag" style="background: ${color}; color: ${textColor};">${envName}</span>`;
+        trackedList.appendChild(header);
+
+        group.forEach((br, i) => {
+          const li = document.createElement('li');
+          li.className = 'branch-item branch-item-nested';
+          li.style.animationDelay = `${i * 60}ms`;
+          li.innerHTML = `<span class="branch-name">${br.name}</span>`;
+          trackedList.appendChild(li);
+        });
+      });
+    }
+
+    // Other branches
+    const otherCard = document.getElementById('otherCard');
+    const otherList = document.getElementById('otherList');
+    otherList.innerHTML = '';
+
+    if (other.length > 0) {
+      otherCard.style.display = 'block';
+      document.getElementById('otherTitle').textContent = `Other Branches (${other.length})`;
+      other.forEach((br, i) => {
         const li = document.createElement('li');
         li.className = 'branch-item';
-        li.style.animationDelay = `${i * 80}ms`;
-        const color = envColors[br.env] || '#6272a4';
-        const textColor = ['#F1FA8C', '#FFB86C', '#8BE9FD', '#50FA7B'].includes(color.toUpperCase()) ? '#282a36' : '#FAFAFA';
-        li.innerHTML = `
-          <span class="env-tag" style="background: ${color}; color: ${textColor};">${br.env}</span>
-          <span class="branch-name">${br.name}</span>
-        `;
-        list.appendChild(li);
+        li.style.animationDelay = `${i * 60}ms`;
+        li.innerHTML = `<span class="branch-name">${br.name}</span>`;
+        otherList.appendChild(li);
       });
+    } else {
+      otherCard.style.display = 'none';
     }
 
     document.getElementById('result').classList.add('visible');
