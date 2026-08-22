@@ -150,20 +150,35 @@ func downloadAndInstall(version string) error {
 
 	fmt.Printf("  Installing to %s...\n", exePath)
 
-	// Try cp first, then sudo cp if needed
-	cpCmd := exec.Command("cp", binaryPath, exePath)
-	if err := cpCmd.Run(); err != nil {
-		fmt.Printf("  Retrying with sudo...\n")
-		sudoCmd := exec.Command("sudo", "cp", binaryPath, exePath)
-		sudoCmd.Stdin = os.Stdin
-		sudoCmd.Stdout = os.Stdout
-		sudoCmd.Stderr = os.Stderr
-		if err := sudoCmd.Run(); err != nil {
-			return fmt.Errorf("install failed\n  Manual install: sudo cp %s %s", binaryPath, exePath)
-		}
+	// Atomic install: write to temp in same dir, then rename
+	exeDir := filepath.Dir(exePath)
+	tmpInstall, err := os.CreateTemp(exeDir, "code-radar-install-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpInstall.Name()
+
+	newBin, err := os.Open(binaryPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to open new binary: %w", err)
 	}
 
-	os.Chmod(exePath, 0755)
+	if _, err := io.Copy(tmpInstall, newBin); err != nil {
+		tmpInstall.Close()
+		os.Remove(tmpPath)
+		newBin.Close()
+		return fmt.Errorf("failed to write binary: %w", err)
+	}
+	tmpInstall.Close()
+	newBin.Close()
+	os.Chmod(tmpPath, 0755)
+
+	// Atomic rename — works even while old binary is running
+	if err := os.Rename(tmpPath, exePath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("install failed: %w\n  Manual: sudo cp %s %s", err, binaryPath, exePath)
+	}
 
 	// macOS Gatekeeper fix
 	if runtime.GOOS == "darwin" {
