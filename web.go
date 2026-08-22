@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 //go:embed web.html
@@ -51,7 +53,7 @@ func startWebServer(addr string) {
 			return
 		}
 
-		parts := splitPipe(commitInfo)
+		parts := splitCommitInfo(commitInfo)
 		result := scanResult{
 			Hash:    parts[0],
 			Message: safeIndex(parts, 1),
@@ -72,13 +74,13 @@ func startWebServer(addr string) {
 	})
 
 	http.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(cfg)
-			return
-		}
+		w.Header().Set("Content-Type", "application/json")
 
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodGet:
+			json.NewEncoder(w).Encode(cfg)
+
+		case http.MethodPost:
 			var newCfg Config
 			if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
 				jsonError(w, "invalid config", http.StatusBadRequest)
@@ -89,19 +91,30 @@ func startWebServer(addr string) {
 				return
 			}
 
-			home, _ := os.UserHomeDir()
-			dir := home + "/.config/code-radar"
-			os.MkdirAll(dir, 0755)
+			home, err := os.UserHomeDir()
+			if err != nil {
+				jsonError(w, "cannot determine home directory", http.StatusInternalServerError)
+				return
+			}
+
+			dir := filepath.Join(home, ".config", "code-radar")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				jsonError(w, "failed to create config directory", http.StatusInternalServerError)
+				return
+			}
+
 			data, _ := json.MarshalIndent(newCfg, "", "  ")
-			os.WriteFile(dir+"/config.yaml", data, 0644)
+			if err := os.WriteFile(filepath.Join(dir, "config.yaml"), data, 0644); err != nil {
+				jsonError(w, "failed to save config", http.StatusInternalServerError)
+				return
+			}
 
 			cfg = newCfg
-			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-			return
-		}
 
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	fmt.Println()
@@ -112,23 +125,13 @@ func startWebServer(addr string) {
 	fmt.Println()
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
-		fmt.Printf("  Server error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "  Server error: %v\n", err)
+		os.Exit(1)
 	}
 }
 
-func splitPipe(s string) []string {
-	result := []string{}
-	current := ""
-	for _, c := range s {
-		if c == '|' {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(c)
-		}
-	}
-	result = append(result, current)
-	return result
+func splitCommitInfo(info string) []string {
+	return strings.Split(info, "|")
 }
 
 func jsonError(w http.ResponseWriter, msg string, code int) {
