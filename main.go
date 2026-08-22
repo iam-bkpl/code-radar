@@ -390,45 +390,6 @@ func renderFull(r scanResult, cfg Config) string {
 		b.WriteString("  │\n")
 	}
 
-	if len(r.Pipeline) > 0 {
-		b.WriteString("\n")
-		b.WriteString(headerStyle.Render("  ┌─ DEPLOYMENT PIPELINE"))
-		b.WriteString("\n")
-		b.WriteString("  │\n")
-
-		for i, p := range r.Pipeline {
-			connector := "├"
-			if i == len(r.Pipeline)-1 {
-				connector = "└"
-			}
-
-			envStyle := getEnvStyleByName(p.Name, cfg)
-			envTag := envStyle.Render(fmt.Sprintf(" %s ", p.Name))
-
-			b.WriteString(fmt.Sprintf("  %s %s %s\n",
-				dimStyle.Render(connector+"─"),
-				envTag,
-				valueStyle.Render(strings.Join(p.Branches, ", ")),
-			))
-		}
-		b.WriteString("  │\n")
-	}
-
-	if len(r.Pipeline) > 1 {
-		b.WriteString("\n")
-		b.WriteString(headerStyle.Render("  ┌─ FLOW"))
-		b.WriteString("\n")
-		b.WriteString("  │\n")
-
-		flowParts := make([]string, 0)
-		for _, p := range r.Pipeline {
-			envStyle := getEnvStyleByName(p.Name, cfg)
-			flowParts = append(flowParts, envStyle.Render(p.Name))
-		}
-		b.WriteString(fmt.Sprintf("  %s %s\n", dimStyle.Render("  "), strings.Join(flowParts, dimStyle.Render(" ──→ "))))
-		b.WriteString("  │\n")
-	}
-
 	b.WriteString("\n")
 	return b.String()
 }

@@ -23,7 +23,7 @@ func defaultConfig() Config {
 	return Config{
 		Environments: []Environment{
 			{Name: "DEV", Pattern: []string{"develop", "dev"}, Color: "#6272A4"},
-			{Name: "QA", Pattern: []string{"qa", "test"}, Color: "#F1FA8C"},
+			{Name: "QA", Pattern: []string{"qa", "test", "release"}, Color: "#F1FA8C"},
 			{Name: "UAT", Pattern: []string{"uat"}, Color: "#FFB86C"},
 			{Name: "STAGING", Pattern: []string{"staging", "stg"}, Color: "#8BE9FD"},
 			{Name: "MASTER", Pattern: []string{"master", "main"}, Color: "#BD93F9"},
