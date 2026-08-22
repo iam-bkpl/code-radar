@@ -178,6 +178,8 @@ environments:
 
 ## Example Output
 
+#### CLI
+
 ```
   📡  CODE RADAR  
 
@@ -198,7 +200,8 @@ environments:
   └─ → MASTER master
   │
 ```
-
+#### Web
+![](image.png)
 ## Troubleshooting
 
 ### macOS: "code-radar cannot be opened because the developer cannot be verified"
