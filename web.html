@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Radar</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #282a36;
+    color: #f8f8f2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .container {
+    max-width: 700px;
+    width: 100%;
+    padding: 40px 20px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+    color: #bd93f9;
+    margin-bottom: 8px;
+  }
+
+  .header p {
+    color: #6272a4;
+    font-size: 0.95rem;
+  }
+
+  .search-box {
+    background: #44475a;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    border: 1px solid #6272a4;
+  }
+
+  .search-box label {
+    display: block;
+    color: #8be9fd;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .input-row input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #6272a4;
+    border-radius: 8px;
+    background: #282a36;
+    color: #f8f8f2;
+    font-size: 1rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-row input:focus {
+    border-color: #bd93f9;
+  }
+
+  .input-row input::placeholder {
+    color: #6272a4;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #bd93f9;
+    color: #282a36;
+  }
+
+  .btn-primary:hover {
+    background: #a77bfa;
+  }
+
+  .btn-primary:disabled {
+    background: #6272a4;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: #8be9fd;
+    border: 1px solid #6272a4;
+    font-size: 0.85rem;
+    padding: 8px 16px;
+  }
+
+  .btn-secondary:hover {
+    border-color: #8be9fd;
+    background: rgba(139, 233, 253, 0.1);
+  }
+
+  .result {
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .result.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    background: #44475a;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid #6272a4;
+  }
+
+  .card-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffb86c;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #6272a4;
+  }
+
+  .detail-row {
+    display: flex;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+
+  .detail-label {
+    color: #8be9fd;
+    font-weight: 600;
+    width: 100px;
+    flex-shrink: 0;
+  }
+
+  .detail-value {
+    color: #f8f8f2;
+    word-break: break-all;
+  }
+
+  .detail-value.hash {
+    color: #50fa7b;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .branch-list {
+    list-style: none;
+  }
+
+  .branch-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #3a3d4e;
+  }
+
+  .branch-item:last-child { border-bottom: none; }
+
+  .env-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #282a36;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .branch-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.95rem;
+    color: #f8f8f2;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #6272a4;
+  }
+
+  .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+
+  .error-msg {
+    background: rgba(255, 85, 85, 0.15);
+    border: 1px solid #ff5555;
+    border-radius: 8px;
+    padding: 16px;
+    color: #ff5555;
+    text-align: center;
+    margin-bottom: 20px;
+    display: none;
+  }
+
+  .error-msg.visible { display: block; }
+
+  .config-section {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .config-section.visible { display: block; }
+
+  .config-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .config-table th {
+    text-align: left;
+    color: #8be9fd;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    padding: 8px;
+    border-bottom: 1px solid #6272a4;
+  }
+
+  .config-table td {
+    padding: 8px;
+    border-bottom: 1px solid #3a3d4e;
+  }
+
+  .config-table input[type="text"] {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #6272a4;
+    border-radius: 4px;
+    background: #282a36;
+    color: #f8f8f2;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    outline: none;
+  }
+
+  .config-table input[type="text"]:focus {
+    border-color: #bd93f9;
+  }
+
+  .config-table input[type="color"] {
+    width: 36px;
+    height: 30px;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .config-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    justify-content: center;
+  }
+
+  .nav-tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    background: transparent;
+    color: #6272a4;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .nav-tab:hover { color: #f8f8f2; }
+
+  .nav-tab.active {
+    color: #bd93f9;
+    border-color: #bd93f9;
+    background: rgba(189, 147, 249, 0.1);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #6272a4;
+    border-top-color: #bd93f9;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📡 Code Radar</h1>
+    <p>Track where your git commits have been deployed</p>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('scan')">Scan Commit</button>
+    <button class="nav-tab" onclick="showTab('config')">Environments</button>
+  </div>
+
+  <div id="scanTab">
+    <div class="search-box">
+      <label>Commit Hash</label>
+      <div class="input-row">
+        <input type="text" id="commitInput" placeholder="e.g. a1b2c3d or abc1234def5678" autofocus>
+        <button class="btn btn-primary" id="scanBtn" onclick="scanCommit()">Scan</button>
+      </div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="result" id="result">
+      <div class="card">
+        <div class="card-title">Commit Details</div>
+        <div class="detail-row">
+          <span class="detail-label">Hash</span>
+          <span class="detail-value hash" id="rHash"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Message</span>
+          <span class="detail-value" id="rMessage"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Author</span>
+          <span class="detail-value" id="rAuthor"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Date</span>
+          <span class="detail-value" id="rDate"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="branchesTitle">Branches</div>
+        <ul class="branch-list" id="branchList"></ul>
+      </div>
+    </div>
+
+    <div class="result visible" id="emptyState">
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <p>Enter a commit hash to see where it's been deployed</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="configTab" class="config-section">
+    <div class="card">
+      <div class="card-title">Environment Configuration</div>
+      <p style="color: #6272a4; font-size: 0.85rem; margin-bottom: 16px;">
+        Define your environments and branch patterns. Branch names are matched case-insensitively using exact match or contains.
+      </p>
+      <table class="config-table">
+        <thead>
+          <tr><th>Name</th><th>Patterns (comma separated)</th><th>Color</th></tr>
+        </thead>
+        <tbody id="configBody"></tbody>
+      </table>
+      <div class="config-actions">
+        <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
+        <button class="btn btn-secondary" onclick="addEnvironment()">+ Add Environment</button>
+      </div>
+      <div class="error-msg" id="configMsg" style="margin-top: 12px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const envColors = {
+  DEV: '#6272a4', QA: '#F1FA8C', UAT: '#FFB86C',
+  STAGING: '#8BE9FD', MASTER: '#BD93F9', PROD: '#FF5555', OTHER: '#6272a4'
+};
+
+let currentConfig = { environments: [] };
+
+document.getElementById('commitInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') scanCommit();
+});
+
+async function scanCommit() {
+  const input = document.getElementById('commitInput').value.trim();
+  if (!input) return;
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  document.getElementById('errorMsg').classList.remove('visible');
+  document.getElementById('result').classList.remove('visible');
+  document.getElementById('emptyState').classList.remove('visible');
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commit: input })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      showError(data.error);
+      return;
+    }
+
+    document.getElementById('rHash').textContent = data.hash.substring(0, 12);
+    document.getElementById('rMessage').textContent = data.message || '—';
+    document.getElementById('rAuthor').textContent = data.author || '—';
+    document.getElementById('rDate').textContent = data.date || '—';
+
+    const list = document.getElementById('branchList');
+    list.innerHTML = '';
+    document.getElementById('branchesTitle').textContent = `Branches (${data.branches.length} found)`;
+
+    if (data.branches.length === 0) {
+      list.innerHTML = '<div class="empty-state"><p>No remote branches contain this commit</p></div>';
+    } else {
+      data.branches.forEach(br => {
+        const li = document.createElement('li');
+        li.className = 'branch-item';
+        const color = envColors[br.env] || '#6272a4';
+        const textColor = ['#F1FA8C', '#FFB86C', '#8BE9FD'].includes(color) ? '#282a36' : '#FAFAFA';
+        li.innerHTML = `
+          <span class="env-tag" style="background: ${color}; color: ${textColor};">${br.env}</span>
+          <span class="branch-name">${br.name}</span>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    document.getElementById('result').classList.add('visible');
+  } catch (err) {
+    showError('Failed to connect to server');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('scanTab').style.display = tab === 'scan' ? 'block' : 'none';
+  document.getElementById('configTab').className = tab === 'config' ? 'config-section visible' : 'config-section';
+  if (tab === 'config') loadConfig();
+}
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    currentConfig = await res.json();
+    renderConfig();
+  } catch (err) {
+    console.error('Failed to load config');
+  }
+}
+
+function renderConfig() {
+  const tbody = document.getElementById('configBody');
+  tbody.innerHTML = '';
+  currentConfig.environments.forEach((env, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${env.name}" onchange="currentConfig.environments[${i}].name = this.value"></td>
+      <td><input type="text" value="${env.pattern.join(', ')}" onchange="currentConfig.environments[${i}].pattern = this.value.split(',').map(s=>s.trim())"></td>
+      <td><input type="color" value="${env.color}" onchange="currentConfig.environments[${i}].color = this.value"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function addEnvironment() {
+  currentConfig.environments.push({ name: 'NEW', pattern: ['new'], color: '#6272a4' });
+  renderConfig();
+}
+
+async function saveConfig() {
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentConfig)
+    });
+    const data = await res.json();
+    if (data.error) {
+      showConfigMsg(data.error, true);
+    } else {
+      showConfigMsg('Config saved!', false);
+    }
+  } catch (err) {
+    showConfigMsg('Failed to save', true);
+  }
+}
+
+function showConfigMsg(msg, isError) {
+  const el = document.getElementById('configMsg');
+  el.textContent = msg;
+  el.style.color = isError ? '#ff5555' : '#50fa7b';
+  el.style.background = isError ? 'rgba(255,85,85,0.15)' : 'rgba(80,250,123,0.15)';
+  el.style.border = `1px solid ${isError ? '#ff5555' : '#50fa7b'}`;
+  el.style.borderRadius = '8px';
+  el.style.padding = '12px';
+  el.style.textAlign = 'center';
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+</script>
+</body>
+</html>

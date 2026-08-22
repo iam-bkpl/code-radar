@@ -233,6 +233,8 @@ func main() {
 	jsonOut := false
 	shortOut := false
 	initMode := false
+	webMode := false
+	webAddr := ":8080"
 	commitHash := ""
 
 	for _, arg := range args {
@@ -249,6 +251,8 @@ func main() {
 			shortOut = true
 		case "--init":
 			initMode = true
+		case "--web":
+			webMode = true
 		default:
 			if !strings.HasPrefix(arg, "-") {
 				commitHash = arg
@@ -263,6 +267,11 @@ func main() {
 		}
 		fmt.Println(successIcon.Render(" Created .code-radar.yaml"))
 		fmt.Println(dimStyle.Render(" Edit it to match your branch naming conventions"))
+		return
+	}
+
+	if webMode {
+		startWebServer(webAddr)
 		return
 	}
 
@@ -509,6 +518,7 @@ func printHelp() {
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--json"), flagStyle.Render("-j"), helpStyle.Render("Output as JSON"))
 	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--short"), flagStyle.Render("-s"), helpStyle.Render("Compact output"))
 	fmt.Printf("    %s        %s\n", flagStyle.Render("--init"), helpStyle.Render("Generate .code-radar.yaml config"))
+	fmt.Printf("    %s        %s\n", flagStyle.Render("--web"), helpStyle.Render("Start web UI on localhost:8080"))
 	fmt.Println()
 
 	fmt.Println(helpStyle.Render("  Config:"))
