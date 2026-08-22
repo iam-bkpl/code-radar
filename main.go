@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -15,6 +18,25 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
+
+type branchInfo struct {
+	Name string `json:"name"`
+	Env  string `json:"env"`
+}
+
+type scanResult struct {
+	Hash     string        `json:"hash"`
+	Message  string        `json:"message"`
+	Author   string        `json:"author"`
+	Date     string        `json:"date"`
+	Branches []branchInfo  `json:"branches"`
+	Pipeline []pipelineEnv `json:"pipeline"`
+}
+
+type pipelineEnv struct {
+	Name     string   `json:"name"`
+	Branches []string `json:"branches"`
+}
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -30,7 +52,8 @@ var (
 
 	labelStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#8BE9FD"))
+			Foreground(lipgloss.Color("#8BE9FD")).
+			Width(12)
 
 	valueStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#F8F8F2"))
@@ -39,52 +62,16 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#50FA7B"))
 
-	branchStyle = lipgloss.NewStyle().
+	branchNameStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#F8F8F2")).
-			PaddingLeft(2)
+			Bold(true)
 
-	// Environment tag styles
-	devStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#6272A4")).
-			Padding(0, 1)
+	dateStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6272A4")).
+			Italic(true)
 
-	qaStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#282A36")).
-			Background(lipgloss.Color("#F1FA8C")).
-			Padding(0, 1)
-
-	uatStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#282A36")).
-			Background(lipgloss.Color("#FFB86C")).
-			Padding(0, 1)
-
-	stagingStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#282A36")).
-			Background(lipgloss.Color("#8BE9FD")).
-			Padding(0, 1)
-
-	masterStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#BD93F9")).
-			Padding(0, 1)
-
-	prodStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#FF5555")).
-			Padding(0, 1)
-
-	otherStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#F8F8F2")).
-			Background(lipgloss.Color("#6272A4")).
-			Padding(0, 1)
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6272A4"))
 
 	successIcon = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#50FA7B")).
@@ -94,32 +81,195 @@ var (
 			Foreground(lipgloss.Color("#FF5555")).
 			Bold(true)
 
-	checkMark = successIcon.Render(" ✓ ")
-	crossMark = errorIcon.Render(" ✗ ")
-	arrow     = lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9")).Render(" → ")
-	dot       = lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(" • ")
+	otherStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#F8F8F2")).
+			Background(lipgloss.Color("#6272A4")).
+			Padding(0, 1)
 )
 
+func makeEnvStyle(color string) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Background(lipgloss.Color(color)).
+		Padding(0, 1)
+}
+
+func getEnvStyleByName(name string, cfg Config) lipgloss.Style {
+	for _, env := range cfg.Environments {
+		if env.Name == name {
+			return makeEnvStyle(env.Color)
+		}
+	}
+	return otherStyle
+}
+
+type model struct {
+	spinner  spinner.Model
+	message  string
+	done     bool
+	result   scanResult
+	err      error
+	jsonOut  bool
+	shortOut bool
+	config   Config
+}
+
+func newSpinnerModel(msg string, jsonOut, shortOut bool, cfg Config) model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
+	return model{
+		spinner:  s,
+		message:  msg,
+		jsonOut:  jsonOut,
+		shortOut: shortOut,
+		config:   cfg,
+	}
+}
+
+type scanCompleteMsg struct {
+	result scanResult
+	err    error
+}
+
+func (m model) Init() tea.Cmd {
+	return tea.Batch(m.spinner.Tick, m.scanCommit())
+}
+
+func (m model) scanCommit() tea.Cmd {
+	return func() tea.Msg {
+		commitHash := m.message
+
+		if err := verifyCommit(commitHash); err != nil {
+			return scanCompleteMsg{err: err}
+		}
+
+		commitInfo, err := getCommitInfo(commitHash)
+		if err != nil {
+			return scanCompleteMsg{err: fmt.Errorf("failed to get commit info: %w", err)}
+		}
+
+		branches, err := findBranchesWithCommit(commitHash)
+		if err != nil {
+			return scanCompleteMsg{err: fmt.Errorf("failed to find branches: %w", err)}
+		}
+
+		parts := strings.Split(commitInfo, "|")
+		result := scanResult{
+			Hash:    parts[0],
+			Message: safeIndex(parts, 1),
+			Author:  safeIndex(parts, 2),
+			Date:    safeIndex(parts, 3),
+		}
+
+		for _, b := range branches {
+			env := matchEnvironment(b, m.config)
+			result.Branches = append(result.Branches, branchInfo{
+				Name: b,
+				Env:  env,
+			})
+		}
+
+		envMap := categorizeBranches(branches, m.config)
+		for _, env := range m.config.Environments {
+			if bs, ok := envMap[env.Name]; ok {
+				result.Pipeline = append(result.Pipeline, pipelineEnv{
+					Name:     env.Name,
+					Branches: bs,
+				})
+			}
+		}
+		if bs, ok := envMap["OTHER"]; ok {
+			result.Pipeline = append(result.Pipeline, pipelineEnv{
+				Name:     "OTHER",
+				Branches: bs,
+			})
+		}
+
+		return scanCompleteMsg{result: result}
+	}
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+		}
+	case scanCompleteMsg:
+		m.done = true
+		m.result = msg.result
+		m.err = msg.err
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
+}
+
+func (m model) View() string {
+	if m.done {
+		if m.err != nil {
+			return renderError(m.err)
+		}
+		if m.jsonOut {
+			return renderJSON(m.result)
+		}
+		if m.shortOut {
+			return renderShort(m.result)
+		}
+		return renderFull(m.result, m.config)
+	}
+
+	return fmt.Sprintf("\n  %s %s\n", m.spinner.View(), dimStyle.Render("Scanning remote branches..."))
+}
+
 func main() {
-	// Handle flags
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
+	args := os.Args[1:]
+	jsonOut := false
+	shortOut := false
+	initMode := false
+	commitHash := ""
+
+	for _, arg := range args {
+		switch arg {
 		case "--help", "-h":
 			printHelp()
 			return
 		case "--version", "-v":
 			printVersion()
 			return
+		case "--json", "-j":
+			jsonOut = true
+		case "--short", "-s":
+			shortOut = true
+		case "--init":
+			initMode = true
+		default:
+			if !strings.HasPrefix(arg, "-") {
+				commitHash = arg
+			}
 		}
 	}
 
-	var commitHash string
+	if initMode {
+		if err := initConfig(); err != nil {
+			fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+err.Error())
+			os.Exit(1)
+		}
+		fmt.Println(successIcon.Render(" Created .code-radar.yaml"))
+		fmt.Println(dimStyle.Render(" Edit it to match your branch naming conventions"))
+		return
+	}
 
-	if len(os.Args) > 1 {
-		commitHash = os.Args[1]
-	} else {
+	if commitHash == "" {
 		fmt.Println()
 		fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  📡 Code Radar"))
+		fmt.Println(dimStyle.Render("  Track where your git commits have been deployed"))
 		fmt.Println()
 		fmt.Print("  Enter commit hash: ")
 		fmt.Scanln(&commitHash)
@@ -131,30 +281,169 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Verify commit exists
-	if err := verifyCommit(commitHash); err != nil {
-		fmt.Println()
-		fmt.Println(errorIcon.Render(" Error: ") + err.Error())
-		fmt.Println()
-		os.Exit(1)
+	cfg := loadConfig()
+
+	if !isTTY() {
+		renderDirect(commitHash, jsonOut, shortOut, cfg)
+		return
 	}
 
-	// Get commit info
-	commitInfo, err := getCommitInfo(commitHash)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error getting commit info: ")+err.Error())
+	m := newSpinnerModel(commitHash, jsonOut, shortOut, cfg)
+	p := tea.NewProgram(m, tea.WithOutput(os.Stdout))
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+err.Error())
 		os.Exit(1)
 	}
+}
 
-	// Find branches containing this commit
-	branches, err := findBranchesWithCommit(commitHash)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error finding branches: ")+err.Error())
-		os.Exit(1)
+func renderError(err error) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(errorIcon.Render(" Error: ") + err.Error())
+	b.WriteString("\n\n")
+	return b.String()
+}
+
+func renderJSON(r scanResult) string {
+	data, _ := json.MarshalIndent(r, "", "  ")
+	return string(data)
+}
+
+func renderShort(r scanResult) string {
+	var b strings.Builder
+	hash := r.Hash
+	if len(hash) > 12 {
+		hash = hash[:12]
+	}
+	b.WriteString(fmt.Sprintf("%s ", hashStyle.Render(hash)))
+	if r.Message != "" {
+		b.WriteString(valueStyle.Render(truncateString(r.Message, 40)) + " ")
+	}
+	if len(r.Branches) > 0 {
+		envs := make([]string, 0)
+		seen := make(map[string]bool)
+		for _, br := range r.Branches {
+			if !seen[br.Env] {
+				seen[br.Env] = true
+				envs = append(envs, br.Env)
+			}
+		}
+		b.WriteString(dimStyle.Render("→ " + strings.Join(envs, " → ")))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+func renderFull(r scanResult, cfg Config) string {
+	var b strings.Builder
+	hash := r.Hash
+	if len(hash) > 12 {
+		hash = hash[:12]
 	}
 
-	// Display results
-	printResults(commitHash, commitInfo, branches)
+	b.WriteString("\n")
+	b.WriteString(titleStyle.Render("  📡  CODE RADAR  "))
+	b.WriteString("\n\n")
+
+	b.WriteString(headerStyle.Render("  ┌─ COMMIT DETAILS"))
+	b.WriteString("\n")
+	b.WriteString("  │\n")
+	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Hash:"), hashStyle.Render(hash)))
+	if r.Message != "" {
+		b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Message:"), valueStyle.Render(truncateString(r.Message, 55))))
+	}
+	if r.Author != "" {
+		b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Author:"), valueStyle.Render(r.Author)))
+	}
+	if r.Date != "" {
+		b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Date:"), dateStyle.Render(truncateString(r.Date, 40))))
+	}
+	b.WriteString("  │\n\n")
+
+	if len(r.Branches) == 0 {
+		b.WriteString(headerStyle.Render("  ┌─ BRANCHES"))
+		b.WriteString("\n")
+		b.WriteString("  │\n")
+		b.WriteString(fmt.Sprintf("  %s %s\n", errorIcon.Render(" ✗ "), errorStyle().Render("No remote branches contain this commit")))
+		b.WriteString("  │\n")
+	} else {
+		b.WriteString(headerStyle.Render(fmt.Sprintf("  ┌─ BRANCHES (%d found)", len(r.Branches))))
+		b.WriteString("\n")
+		b.WriteString("  │\n")
+
+		for i, br := range r.Branches {
+			connector := "├"
+			if i == len(r.Branches)-1 {
+				connector = "└"
+			}
+
+			envStyle := getEnvStyleByName(br.Env, cfg)
+			envTag := envStyle.Render(fmt.Sprintf(" %s ", br.Env))
+
+			b.WriteString(fmt.Sprintf("  %s %s %s %s\n",
+				dimStyle.Render(connector+"─"),
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9")).Render("→"),
+				envTag,
+				branchNameStyle.Render(br.Name),
+			))
+		}
+		b.WriteString("  │\n")
+	}
+
+	if len(r.Pipeline) > 0 {
+		b.WriteString("\n")
+		b.WriteString(headerStyle.Render("  ┌─ DEPLOYMENT PIPELINE"))
+		b.WriteString("\n")
+		b.WriteString("  │\n")
+
+		for i, p := range r.Pipeline {
+			connector := "├"
+			if i == len(r.Pipeline)-1 {
+				connector = "└"
+			}
+
+			envStyle := getEnvStyleByName(p.Name, cfg)
+			envTag := envStyle.Render(fmt.Sprintf(" %s ", p.Name))
+
+			b.WriteString(fmt.Sprintf("  %s %s %s\n",
+				dimStyle.Render(connector+"─"),
+				envTag,
+				valueStyle.Render(strings.Join(p.Branches, ", ")),
+			))
+		}
+		b.WriteString("  │\n")
+	}
+
+	if len(r.Pipeline) > 1 {
+		b.WriteString("\n")
+		b.WriteString(headerStyle.Render("  ┌─ FLOW"))
+		b.WriteString("\n")
+		b.WriteString("  │\n")
+
+		flowParts := make([]string, 0)
+		for _, p := range r.Pipeline {
+			envStyle := getEnvStyleByName(p.Name, cfg)
+			flowParts = append(flowParts, envStyle.Render(p.Name))
+		}
+		b.WriteString(fmt.Sprintf("  %s %s\n", dimStyle.Render("  "), strings.Join(flowParts, dimStyle.Render(" ──→ "))))
+		b.WriteString("  │\n")
+	}
+
+	b.WriteString("\n")
+	return b.String()
+}
+
+func errorStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF5555")).
+		Bold(true)
+}
+
+func safeIndex(parts []string, i int) string {
+	if i < len(parts) {
+		return parts[i]
+	}
+	return ""
 }
 
 func verifyCommit(hash string) error {
@@ -175,18 +464,27 @@ func getCommitInfo(hash string) (string, error) {
 }
 
 func findBranchesWithCommit(hash string) ([]string, error) {
-	cmd := exec.Command("git", "branch", "--contains", hash, "--format=%(refname:short)")
+	fetchCmd := exec.Command("git", "fetch", "--all", "--quiet")
+	fetchCmd.Run()
+
+	cmd := exec.Command("git", "branch", "-r", "--contains", hash, "--format=%(refname:short)")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	rawBranches := parseBranches(string(out))
+	seen := make(map[string]bool)
 	var branches []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			branches = append(branches, line)
+
+	for _, b := range rawBranches {
+		if isRemoteOnly(b) {
+			continue
+		}
+		name := stripRemotePrefix(b)
+		if !seen[name] {
+			seen[name] = true
+			branches = append(branches, name)
 		}
 	}
 
@@ -194,121 +492,31 @@ func findBranchesWithCommit(hash string) ([]string, error) {
 	return branches, nil
 }
 
-func printResults(hash string, info string, branches []string) {
-	parts := strings.Split(info, "|")
-	fullHash := parts[0]
-	message := ""
-	author := ""
-	date := ""
-	if len(parts) > 1 {
-		message = parts[1]
-	}
-	if len(parts) > 2 {
-		author = parts[2]
-	}
-	if len(parts) > 3 {
-		date = parts[3]
-	}
-
-	fmt.Println()
-
-	// Title
-	title := titleStyle.Render("  📡  CODE RADAR  ")
-	fmt.Println(title)
-	fmt.Println()
-
-	// Commit info section
-	fmt.Println(headerStyle.Render("  ┌─ COMMIT DETAILS"))
-	fmt.Println("  │")
-	fmt.Printf("  %s %s\n", labelStyle.Render("Hash:"), hashStyle.Render(fullHash[:12]))
-	if message != "" {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Message:"), valueStyle.Render(truncateString(message, 55)))
-	}
-	if author != "" {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Author:"), valueStyle.Render(author))
-	}
-	if date != "" {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Date:"), valueStyle.Render(truncateString(date, 40)))
-	}
-	fmt.Println("  │")
-	fmt.Println()
-
-	// Branches section
-	if len(branches) == 0 {
-		fmt.Println(headerStyle.Render("  ┌─ BRANCHES"))
-		fmt.Println("  │")
-		fmt.Printf("  %s %s\n", crossMark, errorIcon.Render("No branches contain this commit"))
-		fmt.Println("  │")
-	} else {
-		fmt.Println(headerStyle.Render(fmt.Sprintf("  ┌─ BRANCHES (%d found)", len(branches))))
-		fmt.Println("  │")
-
-		for i, branch := range branches {
-			envTag, style := getBranchStyle(branch)
-			connector := "├"
-			if i == len(branches)-1 {
-				connector = "└"
-			}
-
-			fmt.Printf("  %s %s %s\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(connector+"─"),
-				arrow,
-				branchStyle.Render(style.Render(envTag)+" "+branch),
-			)
+func parseBranches(output string) []string {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var branches []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			branches = append(branches, line)
 		}
-		fmt.Println("  │")
 	}
-
-	// Summary section
-	if len(branches) > 0 {
-		fmt.Println(headerStyle.Render("  ┌─ DEPLOYMENT PIPELINE"))
-		fmt.Println("  │")
-		printPipeline(branches)
-		fmt.Println("  │")
-	}
-
-	fmt.Println()
+	return branches
 }
 
-func printPipeline(branches []string) {
-	envs := categorizeBranches(branches)
-
-	// Define pipeline order
-	pipeline := []struct {
-		name  string
-		style lipgloss.Style
-	}{
-		{"DEV", devStyle},
-		{"QA", qaStyle},
-		{"UAT", uatStyle},
-		{"STAGING", stagingStyle},
-		{"MASTER", masterStyle},
-		{"PROD", prodStyle},
-	}
-
-	for i, p := range pipeline {
-		if bs, ok := envs[p.name]; ok {
-			connector := "├"
-			if i == len(pipeline)-1 {
-				connector = "└"
-			}
-
-			fmt.Printf("  %s %s %s\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render(connector+"─"),
-				p.style.Render(fmt.Sprintf(" %s ", p.name)),
-				valueStyle.Render(strings.Join(bs, ", ")),
-			)
+func stripRemotePrefix(branch string) string {
+	parts := strings.SplitN(branch, "/", 2)
+	if len(parts) == 2 {
+		remote := parts[0]
+		if remote == "origin" || remote == "upstream" || remote == "remote" {
+			return parts[1]
 		}
 	}
+	return branch
+}
 
-	// Other branches
-	if bs, ok := envs["OTHER"]; ok {
-		fmt.Printf("  %s %s %s\n",
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render("└─"),
-			otherStyle.Render(" OTHER"),
-			valueStyle.Render(strings.Join(bs, ", ")),
-		)
-	}
+func isRemoteOnly(branch string) bool {
+	return !strings.Contains(branch, "/")
 }
 
 func truncateString(s string, maxLen int) string {
@@ -318,59 +526,10 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-func categorizeBranches(branches []string) map[string][]string {
-	result := make(map[string][]string)
-	for _, b := range branches {
-		env := categorizeBranchName(b)
-		result[env] = append(result[env], b)
-	}
-	return result
-}
-
-func categorizeBranchName(branch string) string {
-	lower := strings.ToLower(branch)
-	switch {
-	case lower == "master" || lower == "main":
-		return "MASTER"
-	case lower == "prod" || lower == "production":
-		return "PROD"
-	case strings.Contains(lower, "staging") || strings.Contains(lower, "stg"):
-		return "STAGING"
-	case strings.Contains(lower, "uat"):
-		return "UAT"
-	case strings.Contains(lower, "qa") || strings.Contains(lower, "test"):
-		return "QA"
-	case lower == "develop" || lower == "dev":
-		return "DEV"
-	default:
-		return "OTHER"
-	}
-}
-
-func getBranchStyle(branch string) (string, lipgloss.Style) {
-	env := categorizeBranchName(branch)
-	switch env {
-	case "DEV":
-		return "DEV", devStyle
-	case "QA":
-		return "QA", qaStyle
-	case "UAT":
-		return "UAT", uatStyle
-	case "STAGING":
-		return "STAGING", stagingStyle
-	case "MASTER":
-		return "MASTER", masterStyle
-	case "PROD":
-		return "PROD", prodStyle
-	default:
-		return "OTHER", otherStyle
-	}
-}
-
 func printHelp() {
 	fmt.Println()
 	fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).Render("  📡 Code Radar"))
-	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4")).Render("  Track where your git commits have been deployed"))
+	fmt.Println(dimStyle.Render("  Track where your git commits have been deployed"))
 	fmt.Println()
 
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8F8F2"))
@@ -379,24 +538,28 @@ func printHelp() {
 
 	fmt.Println(helpStyle.Render("  Usage:"))
 	fmt.Println()
-	fmt.Printf("    %s %s\n", commandStyle.Render("code-radar"), flagStyle.Render("<commit-hash>"))
-	fmt.Println(helpStyle.Render("      Track a specific commit across branches"))
-	fmt.Println()
-	fmt.Printf("    %s\n", commandStyle.Render("code-radar"))
-	fmt.Println(helpStyle.Render("      Interactive mode - prompts for commit hash"))
+	fmt.Printf("    %s %s\n", commandStyle.Render("code-radar"), flagStyle.Render("[flags] <commit-hash>"))
 	fmt.Println()
 
 	fmt.Println(helpStyle.Render("  Flags:"))
 	fmt.Println()
-	fmt.Printf("    %s, %s\n", flagStyle.Render("--help, -h"), helpStyle.Render("Show this help message"))
-	fmt.Printf("    %s, %s\n", flagStyle.Render("--version, -v"), helpStyle.Render("Show version information"))
+	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--help"), flagStyle.Render("-h"), helpStyle.Render("Show this help message"))
+	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--version"), flagStyle.Render("-v"), helpStyle.Render("Show version information"))
+	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--json"), flagStyle.Render("-j"), helpStyle.Render("Output as JSON"))
+	fmt.Printf("    %s, %-10s %s\n", flagStyle.Render("--short"), flagStyle.Render("-s"), helpStyle.Render("Compact output"))
+	fmt.Printf("    %s        %s\n", flagStyle.Render("--init"), helpStyle.Render("Generate .code-radar.yaml config"))
 	fmt.Println()
 
-	fmt.Println(helpStyle.Render("  Examples:"))
+	fmt.Println(helpStyle.Render("  Config:"))
 	fmt.Println()
-	fmt.Println(helpStyle.Render("    code-radar a1b2c3d"))
-	fmt.Println(helpStyle.Render("    code-radar abc1234def5678"))
-	fmt.Println(helpStyle.Render("    code-radar"))
+	fmt.Println(helpStyle.Render("    Create .code-radar.yaml in your project root:"))
+	fmt.Println()
+	fmt.Println(dimStyle.Render("      environments:"))
+	fmt.Println(dimStyle.Render("        - name: DEV"))
+	fmt.Println(dimStyle.Render("          pattern: [develop, dev]"))
+	fmt.Println(dimStyle.Render("          color: \"#6272A4\""))
+	fmt.Println()
+	fmt.Println(helpStyle.Render("    Run code-radar --init to generate a default config"))
 	fmt.Println()
 }
 
@@ -404,4 +567,71 @@ func printVersion() {
 	fmt.Println()
 	fmt.Printf("code-radar %s (commit: %s, built: %s)\n", version, commit, date)
 	fmt.Println()
+}
+
+func isTTY() bool {
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
+func renderDirect(commitHash string, jsonOut, shortOut bool, cfg Config) {
+	if err := verifyCommit(commitHash); err != nil {
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+err.Error())
+		os.Exit(1)
+	}
+
+	commitInfo, err := getCommitInfo(commitHash)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+err.Error())
+		os.Exit(1)
+	}
+
+	branches, err := findBranchesWithCommit(commitHash)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, errorIcon.Render(" Error: ")+err.Error())
+		os.Exit(1)
+	}
+
+	parts := strings.Split(commitInfo, "|")
+	result := scanResult{
+		Hash:    parts[0],
+		Message: safeIndex(parts, 1),
+		Author:  safeIndex(parts, 2),
+		Date:    safeIndex(parts, 3),
+	}
+
+	for _, b := range branches {
+		env := matchEnvironment(b, cfg)
+		result.Branches = append(result.Branches, branchInfo{
+			Name: b,
+			Env:  env,
+		})
+	}
+
+	envMap := categorizeBranches(branches, cfg)
+	for _, env := range cfg.Environments {
+		if bs, ok := envMap[env.Name]; ok {
+			result.Pipeline = append(result.Pipeline, pipelineEnv{
+				Name:     env.Name,
+				Branches: bs,
+			})
+		}
+	}
+	if bs, ok := envMap["OTHER"]; ok {
+		result.Pipeline = append(result.Pipeline, pipelineEnv{
+			Name:     "OTHER",
+			Branches: bs,
+		})
+	}
+
+	if jsonOut {
+		fmt.Print(renderJSON(result))
+	} else if shortOut {
+		fmt.Print(renderShort(result))
+	} else {
+		fmt.Print(renderFull(result, cfg))
+	}
 }
